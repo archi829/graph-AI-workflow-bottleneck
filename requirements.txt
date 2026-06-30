@@ -1,0 +1,15 @@
+crewai>=1.15.1
+litellm>=1.0.0
+tenacity>=9.0
+duckduckgo-search>=6.0
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-dotenv>=1.0
+openinference-instrumentation-crewai
+langfuse>=3.0
+
+# Uncomment when starting open_deep_research (Day 2-3):
+# langgraph
+# langchain
+# tavily-python
+# duckduckgo-search

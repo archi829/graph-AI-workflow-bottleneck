@@ -1,0 +1,57 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    # Talks to Langfuse via LANGFUSE_HOST in .env -- either Langfuse Cloud
+    # or a self-hosted stack Person B runs separately. See README.md,
+    # "Langfuse: a heads-up" section, for why this isn't bundled here.
+
+# --- Uncomment if you want a fully local, self-hosted Langfuse v3 stack ---
+# instead of Langfuse Cloud. This is the CURRENT (2026) requirement -- six
+# containers, not the Postgres-only setup the original project doc assumed.
+# Pull the canonical, up-to-date version from:
+#   https://langfuse.com/self-hosting/deployment/docker-compose
+# rather than copy-pasting this, since env var names/ports do change.
+#
+#  langfuse-web:
+#    image: langfuse/langfuse:3
+#    ports: ["3000:3000"]
+#    depends_on: [postgres, minio, redis, clickhouse]
+#    env_file: [.env.langfuse]
+#  langfuse-worker:
+#    image: langfuse/langfuse-worker:3
+#    depends_on: [postgres, minio, redis, clickhouse]
+#    env_file: [.env.langfuse]
+#  postgres:
+#    image: postgres:17
+#    environment:
+#      POSTGRES_USER: langfuse
+#      POSTGRES_PASSWORD: langfuse
+#      POSTGRES_DB: langfuse
+#    volumes: ["pgdata:/var/lib/postgresql/data"]
+#  clickhouse:
+#    image: clickhouse/clickhouse-server
+#    environment:
+#      CLICKHOUSE_DB: default
+#      CLICKHOUSE_USER: clickhouse
+#      CLICKHOUSE_PASSWORD: clickhouse
+#    ports: ["8123:8123", "9000:9000"]
+#    volumes: ["chdata:/var/lib/clickhouse"]
+#  redis:
+#    image: redis:7
+#    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+#  minio:
+#    image: minio/minio
+#    command: server /data --console-address ":9091"
+#    ports: ["9090:9000", "9091:9091"]
+#    volumes: ["miniodata:/data"]
+#
+# volumes:
+#   pgdata:
+#   chdata:
+#   miniodata:
