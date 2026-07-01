@@ -114,6 +114,7 @@ def main() -> None:
                 "tokens_used": result.tokens_used,
                 "retries": result.retries,
                 "structured_output": result.structured_output,
+                "trace_id": result.trace_id,
                 "faulty_batch": args.faulty,
             }
             records.append(record)
@@ -125,11 +126,33 @@ def main() -> None:
                 f"success={result.success} ({result.duration_s:.1f}s, retries={result.retries})"
                 + (f" error_type={result.synthetic_error_type}" if not result.success else "")
             )
+
+            # Flush to Langfuse every 10 tasks so traces appear incrementally
+            # rather than all at the end -- safer for long overnight runs where
+            # a crash near the end would otherwise lose everything.
+            if (i + 1) % 10 == 0:
+                try:
+                    from langfuse import get_client
+                    get_client().flush()
+                    print(f"  → flushed {i + 1} traces to Langfuse")
+                except Exception:
+                    pass
+
             time.sleep(args.sleep)
 
     print(f"\nDone. {successes} succeeded, {failures} failed. Run log: {out_path}")
     print("Scorecard:", evaluate_batch(records))
-    print("Next: confirm traces are visible in Langfuse, then have Person B run export_traces.py.")
+
+    if args.system == "crewai":
+        try:
+            from langfuse import get_client
+
+            get_client().flush()
+            print("Flushed pending traces to Langfuse.")
+        except ImportError:
+            pass
+
+    print(f"Next: python export_traces.py --system {args.system} --input {out_path}")
 
 
 if __name__ == "__main__":

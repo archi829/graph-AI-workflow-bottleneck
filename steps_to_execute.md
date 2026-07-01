@@ -1,6 +1,6 @@
 # Setup Steps
 
-1. Create and activate a virtual environment.
+1. Create and activate a virtual environment. -> `source venv/bin/activate`
 
 2. Install each dependency **individually**.
    - Avoid using `requirements.txt` because dependency resolution hangs.
