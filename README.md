@@ -45,7 +45,7 @@ lowest-friction starting point (and to stay clear of FinRobot, since that
 one may already be claimed). Structure follows Appendix A of the project
 doc so `open_deep_research` or `finrobot` can be dropped in later as
 `agents/open_deep_research_agent.py` / `agents/finrobot_agent.py` without
-touching `run_batch.py` or `app.py` — they just register in `agents/__init__.py`.
+touching `run_batch.py` or `app.py` -- they just register in `agents/__init__.py`.
 
 ## What's here
 
@@ -79,21 +79,21 @@ research output into the writer's prompt automatically.
 
 **Tool usage.** The Researcher has three tools, deliberately different in
 nature so the trace graph gets real `role=tool` node diversity:
-- `local_knowledge` — small in-repo knowledge base; this is also the hook
+- `local_knowledge` -- small in-repo knowledge base; this is also the hook
   point for `FAIL_RETRIEVAL_PROB` injection (a real tool-call failure, not
   a prompt trick)
-- `web_search` — real DuckDuckGo search, no API key needed; degrades to a
+- `web_search` -- real DuckDuckGo search, no API key needed; degrades to a
   clear "unavailable" string on network failure rather than raising or
   fabricating results
-- `calculator` — sandboxed arithmetic eval (character-whitelisted, no
+- `calculator` -- sandboxed arithmetic eval (character-whitelisted, no
   builtins) for cost/budget comparisons
 
-**Structured outputs.** Both tasks use `output_pydantic` — `ResearchFindings`
+**Structured outputs.** Both tasks use `output_pydantic` -- `ResearchFindings`
 and `FinalAnswer` (`agents/schemas.py`). This isn't "ask nicely for JSON in
 the prompt": CrewAI validates against the Pydantic model and only accepts
 the task as complete once it parses.
 
-**Retries — two distinct layers:**
+**Retries -- two distinct layers:**
 1. *Guardrail retries* (in-loop): each task has a `guardrail` function
    (`agents/evaluation.py::research_guardrail` / `final_answer_guardrail`)
    that checks the parsed output isn't just schema-valid but *substantively*
@@ -104,7 +104,7 @@ the task as complete once it parses.
 2. *Crew-level retries* (transient failures): `_kickoff_with_retry` wraps
    the whole `crew.kickoff()` call in a `tenacity` retry with exponential
    backoff (2s/4s/8s), triggered only on `TimeoutError` / `ConnectionError`
-   / `OSError` — i.e. infra blips, not bad output (which guardrails already
+   / `OSError` -- i.e. infra blips, not bad output (which guardrails already
    handle). Configurable via `CREW_MAX_RETRIES` (default 3). Verified with a
    fake crew that fails twice then succeeds, and one that always fails.
 
@@ -118,13 +118,13 @@ output locally before it ever reaches Person C's labeling pipeline.
 
 **`RunResult` (agents/base.py)** carries `structured_output` (the Writer's
 `FinalAnswer` as a dict), `tokens_used`, and `retries` alongside the
-original fields — all enriched via a `_enrich_result` hook so the base
+original fields -- all enriched via a `_enrich_result` hook so the base
 `AgentSystem.run()` contract didn't need to change.
 
 ## Verified against the actual installed packages (not just the doc)
 
-I built and tested this against real installs in a sandbox — not from
-memory — and want to flag what's drifted or wasn't obvious from docs alone:
+I built and tested this against real installs in a sandbox -- not from
+memory -- and want to flag what's drifted or wasn't obvious from docs alone:
 
 1. **`crewai`'s `groq/llama-3.1-70b-versatile` model string needs `litellm`
    installed explicitly.** Current CrewAI (1.15.1) only resolves native
@@ -137,31 +137,28 @@ memory — and want to flag what's drifted or wasn't obvious from docs alone:
    (which inspects the guardrail's signature via `inspect.signature`)
    fails with a cryptic `ValueError` because it can't resolve `tuple[bool,
    Any]` as a string. Fix: don't annotate the guardrail's return type at
-   all (the docstring documents the contract instead) — see
+   all (the docstring documents the contract instead) -- see
    `agents/evaluation.py`.
 
 3. **Langfuse self-hosting is not Postgres-only anymore.** The project doc
    (Section 6) describes a 2-service setup. As of Langfuse v3, self-hosting
    needs **six** containers: web, worker, Postgres, ClickHouse, Redis,
    MinIO. For Sprint 1's ~300-400 trace target, I'd suggest **Langfuse
-   Cloud's free tier** instead — set `LANGFUSE_HOST=https://cloud.langfuse.com`
+   Cloud's free tier** instead -- set `LANGFUSE_HOST=https://cloud.langfuse.com`
    in `.env` and skip the six-container stack. A correct (but commented-out)
    self-hosted block is in `docker-compose.yml` if the team decides
    otherwise.
 
-<<<<<<< HEAD
 4. **litellm needs the `ollama/` prefix, not a bare model name + base_url.**
    `LLM(model="llama3.2:3b", base_url="http://localhost:11434/v1")` raises
-   `BadRequestError: LLM Provider NOT provided` — litellm routes by prefix,
+   `BadRequestError: LLM Provider NOT provided` -- litellm routes by prefix,
    not by base_url alone. Use `LLM_MODEL=ollama/llama3.2:3b`. Verified
    directly with `litellm.get_llm_provider()`.
 
-=======
->>>>>>> 17ab2c83e513018d90a7f57c60b3692b17f2a163
 Everything else (Agent/Task/Crew/Process field names, `output_pydantic`,
 `guardrail`/`guardrail_max_retries`, `@tool` decorator signature,
 `openinference-instrumentation-crewai`, `langfuse`, `tenacity`) matched the
-doc and installed versions — checked by direct import/construction, not
+doc and installed versions -- checked by direct import/construction, not
 assumption.
 
 ## Quickstart
@@ -195,21 +192,23 @@ Note on injection fidelity: `loop` (task repetition), `timeout` (real sleep
 + raise), and `retrieval_fail` (the `local_knowledge` tool genuinely returns
 a failure string) are mechanically real. `hallucination` and
 `context_overflow` are **prompt-level approximations**, since a tool-less
-Writer step has no natural mechanism to fail that way — see the docstring
+Writer step has no natural mechanism to fail that way -- see the docstring
 in `agents/crewai_agent.py::_maybe_corrupt_task`. If those two motifs'
 density matters a lot for the GNN, they'll be more naturally sourced from
 `open_deep_research` or a RAG-style system (project doc Section 10 makes
 the same point about `agentic-rag-for-dummies`).
 
-## What's NOT done yet (by design — other people's rows)
+## Binary Success/Fail Classification Results (Sprint 1 baseline)
 
-- Langfuse deployment + `export_traces.py` → `data/raw/*.json` schema mapping (Person B)
-- TRAIL ingestion, labeling, `build_dataset.py` (Person C)
-- `open_deep_research` and `finrobot` system wrappers (whoever picks those up next)
+Ran `train_success_binary.py` with stratified 5-fold CV on **139 graphs**
+(class balance: `success=119`, `fail=20`).
 
-## Next step for you
+### XGBoost (binary success/fail)
+- **Mean macro-F1**: 0.876 ± 0.040
+- **Accuracy**: 0.94
+- Per-fold macro-F1: `[0.918, 0.878, 0.813, 0.918, 0.853]`
 
-Run the smoke test, confirm `data/raw/agent_system=crewai/batch_*.jsonl` gets
-written with `structured_output` populated, and — once Langfuse is reachable
-(Cloud or self-hosted) — confirm the 3 smoke-test traces actually show up
-with spans visible, per Section 15 Day 1 checklist.
+### GNN (binary success/fail)
+- **Mean macro-F1**: 0.846 ± 0.039
+- **Accuracy**: 0.93
+- Per-fold macro-F1: `[0.813, 0.83, 0.813, 0.918, 0.853]`
