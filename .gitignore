@@ -5,5 +5,4 @@ __pycache__/
 !data/raw/.gitkeep
 data/index/*
 !data/index/.gitkeep
-*.jsonl
 .DS_Store
