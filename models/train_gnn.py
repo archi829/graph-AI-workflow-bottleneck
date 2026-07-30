@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-train_gnn.py  --  GNN bottleneck-detection training with stratified 5-fold CV.
+models/train_gnn.py  --  GNN bottleneck-detection training with stratified 5-fold CV.
 
 Why these choices (per the dataset's small, imbalanced class sizes:
 84 clean vs 10-17 faulty):
@@ -14,8 +14,8 @@ Why these choices (per the dataset's small, imbalanced class sizes:
     far more stable estimate of per-class performance.
 
 Run:
-    python train_gnn.py
-    python train_gnn.py --folds 5 --epochs 60 --hidden 64
+    python models/train_gnn.py
+    python models/train_gnn.py --folds 5 --epochs 60 --hidden 64
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ import train_common as tc
 # ---------------------------------------------------------------------------
 class BottleneckGNN(torch.nn.Module):
     """RGCN that uses the edge-type signal (control_flow vs tool_call)
-    captured by export_gnn_graphs.py in data.edge_attr.
+    captured by graph/builder.py in data.edge_attr.
 
     Unlike a plain GCN, RGCNConv learns a separate relation-specific weight
     matrix per edge type, so the model can distinguish a slow tool-call edge

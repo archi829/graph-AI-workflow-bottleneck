@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-export_gnn_graphs.py  —  Convert exported trace JSONs to PyTorch Geometric Data objects.
+graph/builder.py  —  Convert exported trace JSONs to PyTorch Geometric Data objects.
 
 Reads the schema-conformant trace JSON files written by export_traces.py
 (data/raw/agent_system=open_deep_research/*.json), constructs graph-structured
@@ -31,9 +31,9 @@ Graph-level targets (y — shape [1]):
          4=context_overflow, 5=hallucination, 6=faulty_other
 
 Usage:
-    python export_gnn_graphs.py --input-dir data/raw/agent_system=open_deep_research
-    python export_gnn_graphs.py --input-dir data/raw/agent_system=open_deep_research --out data/graphs
-    python export_gnn_graphs.py --input-dir data/raw  # scans all agent_system=*/ subdirs
+    python graph/builder.py --input-dir data/raw/agent_system=open_deep_research
+    python graph/builder.py --input-dir data/raw/agent_system=open_deep_research --out data/graphs
+    python graph/builder.py --input-dir data/raw  # scans all agent_system=*/ subdirs
 """
 
 from __future__ import annotations

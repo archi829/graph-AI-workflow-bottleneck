@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-backfill_tokens.py  --  One-off backfill for already-exported traces.
+scripts/backfill_tokens.py  --  One-off backfill for already-exported traces.
 
 Problem: the 139 traces under data/raw/ were exported before export_traces.py
 estimated tokens, so every span has tokens_in=tokens_out=0 and
@@ -23,8 +23,8 @@ ACCURATE per-span token counts, re-run export_traces.py after the tiktoken
 fix (which reads the real input/output text from Langfuse).
 
 Usage:
-    python backfill_tokens.py
-    python backfill_tokens.py --raw-dir data/raw --rate 0.00001
+    python scripts/backfill_tokens.py
+    python scripts/backfill_tokens.py --raw-dir data/raw --rate 0.00001
 """
 
 from __future__ import annotations
@@ -150,7 +150,7 @@ def main() -> None:
     print(f"\nDone. files={total_files}  spans_backfilled={total_spans_changed}  "
           f"sum_total_tokens={total_tokens}" + ("  [DRY RUN]" if args.dry_run else ""))
     if not args.dry_run and total_files:
-        print("Next: python export_gnn_graphs.py --overwrite")
+        print("Next: python graph/builder.py --overwrite")
 
 
 if __name__ == "__main__":

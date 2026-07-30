@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-train_success_binary.py -- Binary success/fail classification from trace graphs.
+models/train_success_binary.py -- Binary success/fail classification from trace graphs.
 
-Reuses the .pt files already produced by export_gnn_graphs.py. Target is
+Reuses the .pt files already produced by graph/builder.py. Target is
 data.run_labels_success (bool), NOT the multiclass failure-type label (data.y).
 No re-export needed -- this label was already stored on every graph.
 
 Usage:
-    python train_success_binary.py --model xgboost
-    python train_success_binary.py --model gnn
+    python models/train_success_binary.py --model xgboost
+    python models/train_success_binary.py --model gnn
 """
 
 from __future__ import annotations

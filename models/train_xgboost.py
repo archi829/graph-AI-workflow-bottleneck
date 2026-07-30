@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-train_xgboost.py  --  XGBoost bottleneck-detection training with stratified 5-fold CV.
+models/train_xgboost.py  --  XGBoost bottleneck-detection training with stratified 5-fold CV.
 
 Mirrors the GNN script's evaluation protocol so the two models are comparable:
   * StratifiedKFold (shuffle=True) preserves class ratios in every fold.
@@ -11,8 +11,8 @@ Mirrors the GNN script's evaluation protocol so the two models are comparable:
     ~2 timeout traces in test -- too few to trust.
 
 Run:
-    python train_xgboost.py
-    python train_xgboost.py --folds 5 --estimators 300
+    python models/train_xgboost.py
+    python models/train_xgboost.py --folds 5 --estimators 300
 """
 
 from __future__ import annotations

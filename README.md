@@ -48,15 +48,15 @@ touching `scripts/run_batch.py` or `api/app.py` — they just register in `agent
 | Langfuse span tracing | Done for both agent systems |
 | Batch runners + FastAPI wrappers | Done — `run_batch.py` / `app.py` (CrewAI), `run_langgraph_batch.py` / `run_langgraph_app.py` (LangGraph) |
 | Trace export from Langfuse → schema JSON | Done — `export_traces(crewai wo ids).py` |
-| Token/cost backfill for pre-fix traces | Done — `backfill_tokens.py` |
+| Token/cost backfill for pre-fix traces | Done — `scripts/backfill_tokens.py` |
 | Dataset indexing (`build_dataset.py`) | Implemented, but its output (`data/index.jsonl`) is **not** what feeds GNN training — see note below |
 | JSONL merge scripts (`crewjsonl.py`, `merge_traces.py`) | Done, ad hoc one-off scripts |
-| Graph construction (`export_gnn_graphs.py`) | Done — produces `.pt` files per trace |
-| GNN training (RGCN, 5-fold CV) | Done — `train_gnn.py` |
-| XGBoost baseline (5-fold CV) | Done — `train_xgboost.py` |
-| Binary success/fail classifier | Done — `train_success_binary.py` (reuses graphs, no re-export needed) |
+| Graph construction (`graph/builder.py`) | Done — produces `.pt` files per trace |
+| GNN training (RGCN, 5-fold CV) | Done — `models/train_gnn.py` |
+| XGBoost baseline (5-fold CV) | Done — `models/train_xgboost.py` |
+| Binary success/fail classifier | Done — `models/train_success_binary.py` (reuses graphs, no re-export needed) |
 | FinRobot agent system | **Not started** — referenced in comments as future work, no code exists |
-| GAT / HeteroGAT variants mentioned in `project_progress.md` | **Not implemented** — only the RGCN in `train_gnn.py` exists |
+| GAT / HeteroGAT variants mentioned in `project_progress.md` | **Not implemented** — only the RGCN in `models/train_gnn.py` exists |
 | Random Forest baseline | **Not implemented** — only XGBoost |
 
 ---
@@ -71,20 +71,20 @@ flowchart TD
     C --> D["export_traces.py\n(export_traces(crewai wo ids).py)"]
     L --> D
     D --> E[per-trace JSON\ndata/raw/agent_system=*/*.json]
-    E --> F[backfill_tokens.py\nproxy token/cost fill]
+    E --> F[scripts/backfill_tokens.py\nproxy token/cost fill]
     E --> G[crewjsonl.py /\nmerge_traces.py]
     G --> H[crew_traces.jsonl\nopen_deep_research_traces.jsonl]
-    E --> I[export_gnn_graphs.py]
+    E --> I[graph/builder.py]
     I --> J[data/graphs/agent_system=*/*.pt\ntorch_geometric.data.Data]
-    J --> K1[train_gnn.py\nRGCN, 5-fold CV]
-    J --> K2[train_xgboost.py\nXGBoost, 5-fold CV]
-    J --> K3[train_success_binary.py\nsuccess vs. fail]
+    J --> K1[models/train_gnn.py\nRGCN, 5-fold CV]
+    J --> K2[models/train_xgboost.py\nXGBoost, 5-fold CV]
+    J --> K3[models/train_success_binary.py\nsuccess vs. fail]
     E --> M[build_dataset.py]
     M --> N[data/index.jsonl\nmanifest -- not used\nby GNN/XGBoost training]
 ```
 
 **Two datasets exist in parallel and are not the same thing:**
-- `data/raw/agent_system=*/*.json` → `export_gnn_graphs.py` → `data/graphs/` is what `train_gnn.py`, `train_xgboost.py`, and `train_success_binary.py` actually consume.
+- `data/raw/agent_system=*/*.json` → `graph/builder.py` → `data/graphs/` is what `models/train_gnn.py`, `models/train_xgboost.py`, and `models/train_success_binary.py` actually consume.
 - `build_dataset.py` → `data/index.jsonl` computes global percentile-based `slow`/`expensive` labels as a manifest, but per `project_progress.md`, this file is **not** wired into the GNN/XGBoost training path.
 
 ---
@@ -226,13 +226,13 @@ uvicorn run_langgraph_app:app --reload --port 8001                     # separat
 python "export_traces(crewai wo ids).py" --input data/raw/agent_system=crewai/batch_<timestamp>.jsonl
 
 # 2. (only needed for traces exported before the tiktoken-based token estimation was added)
-python backfill_tokens.py --raw-dir data/raw
+python scripts/backfill_tokens.py --raw-dir data/raw
 
 # 3. Convert exported trace JSON into torch_geometric graphs
-python export_gnn_graphs.py --input-dir data/raw   # scans all agent_system=*/ subdirs
+python graph/builder.py --input-dir data/raw   # scans all agent_system=*/ subdirs
 ```
 
-`export_gnn_graphs.py` builds, per trace, a `torch_geometric.data.Data` object with:
+`graph/builder.py` builds, per trace, a `torch_geometric.data.Data` object with:
 
 - **Node features** — role one-hot (agent/llm/tool), log-normalized latency/tokens/cost, error flag, loop index, model one-hot, node-type one-hot.
 - **Edge attributes** — one-hot over `{control_flow, tool_call}`.
@@ -245,16 +245,16 @@ python export_gnn_graphs.py --input-dir data/raw   # scans all agent_system=*/ s
 ## Model Training
 
 ```bash
-python train_gnn.py --folds 5 --epochs 60 --hidden 64
-python train_xgboost.py --folds 5 --estimators 300
-python train_success_binary.py --model xgboost      # or --model gnn
+python models/train_gnn.py --folds 5 --epochs 60 --hidden 64
+python models/train_xgboost.py --folds 5 --estimators 300
+python models/train_success_binary.py --model xgboost      # or --model gnn
 ```
 
-- **`train_gnn.py`** trains an RGCN (`BottleneckGNN` — two `RGCNConv` layers over the `control_flow` / `tool_call` edge types + mean pooling + linear head) with stratified 5-fold CV and inverse-frequency class weighting, since the label distribution is heavily imbalanced (~84 clean vs. 10–17 per faulty class).
-- **`train_xgboost.py`** flattens each graph into a fixed-size feature vector (`train_common.py::graph_to_features`) and trains XGBoost with the same 5-fold protocol, as a non-graph baseline for comparison.
-- **`train_success_binary.py`** reuses the same `.pt` files but targets `run_labels_success` (binary) instead of the multiclass failure-type label — no re-export required.
+- **`models/train_gnn.py`** trains an RGCN (`BottleneckGNN` — two `RGCNConv` layers over the `control_flow` / `tool_call` edge types + mean pooling + linear head) with stratified 5-fold CV and inverse-frequency class weighting, since the label distribution is heavily imbalanced (~84 clean vs. 10–17 per faulty class).
+- **`models/train_xgboost.py`** flattens each graph into a fixed-size feature vector (`models/train_common.py::graph_to_features`) and trains XGBoost with the same 5-fold protocol, as a non-graph baseline for comparison.
+- **`models/train_success_binary.py`** reuses the same `.pt` files but targets `run_labels_success` (binary) instead of the multiclass failure-type label — no re-export required.
 
-The present label space is `{normal, loop, timeout, retrieval_fail, hallucination}` — `context_overflow` and `faulty_other` have zero examples in the current dataset, so `train_common.py::remap_labels` compacts the space to whatever classes are actually present.
+The present label space is `{normal, loop, timeout, retrieval_fail, hallucination}` — `models/train_common.py::remap_labels` compacts the space to whatever classes are actually present.
 
 ---
 
@@ -314,9 +314,9 @@ If Ollama runs on Windows and the agent code runs in WSL, `steps_to_execute.md` 
 ## Known Gaps and Rough Edges
 
 - **FinRobot** is referenced throughout comments (`agents/__init__.py`, `run_langgraph_batch.py --system` flag) as a third planned agent system, but no `finrobot_agent.py` exists yet.
-- **GAT and HeteroGAT**, listed as planned models in `project_progress.md`, are not implemented — `train_gnn.py` only contains the RGCN.
+- **GAT and HeteroGAT**, listed as planned models in `project_progress.md`, are not implemented — `models/train_gnn.py` only contains the RGCN.
 - **Random Forest baseline**, also listed in `project_progress.md`, is not implemented — only the XGBoost baseline exists.
-- `data/index.jsonl` (from `build_dataset.py`) and the `.pt` graph dataset (from `export_gnn_graphs.py`) are two independent outputs; only the latter feeds model training.
+- `data/index.jsonl` (from `build_dataset.py`) and the `.pt` graph dataset (from `graph/builder.py`) are two independent outputs; only the latter feeds model training.
 - `data/raw/agent_system=open_deep_research/` is not present in this checkout (only its `.pt` graphs and the merged `open_deep_research_traces.jsonl` are) — likely excluded by `*.jsonl`/local export conventions rather than missing from the pipeline itself.
 - The repo's own `README.md` prior to this rewrite still contained an unresolved git merge-conflict marker block (`<<<<<<< HEAD ... >>>>>>>`) around the Ollama/litellm note.
 - `requirements.txt` installs can hang on some machines during resolution; `steps_to_execute.md` recommends installing packages individually as a workaround.

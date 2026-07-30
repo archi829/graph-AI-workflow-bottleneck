@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-train_common.py  --  Shared data loading for GNN / XGBoost bottleneck-detection training.
+models/train_common.py  --  Shared data loading for GNN / XGBoost bottleneck-detection training.
 
-Loads the .pt graph files produced by export_gnn_graphs.py and exposes:
+Loads the .pt graph files produced by graph/builder.py and exposes:
   * load_graphs()        -> (list[Data], list[int raw labels])
   * remap_labels()       -> contiguous 0..K-1 labels + mapping
   * graph_to_features()  -> fixed-size flat vector per graph (for XGBoost)
@@ -29,7 +29,7 @@ LABEL_NAMES = {
     6: "faulty_other",
 }
 
-NUM_NODE_FEATURES = 31  # must match NODE_FEATURE_DIM in export_gnn_graphs.py
+NUM_NODE_FEATURES = 31  # must match NODE_FEATURE_DIM in graph/builder.py
 
 
 def load_graphs(graphs_dir: str = "data/graphs"):
