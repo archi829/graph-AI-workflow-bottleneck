@@ -1,21 +1,24 @@
 """
 Standalone FastAPI for the Custom LangGraph Agent.
-Run locally: uvicorn run_langgraph_app:app --reload --port 8001
-(Using port 8001 so it doesn't collide with her app on 8000)
+Run locally: uvicorn api.run_langgraph_app:app --reload --port 8001
+(Using port 8001 so it doesn't collide with the CrewAI app on 8000)
 """
+
 from __future__ import annotations
+
+import os
 import uuid
 from pathlib import Path
 from typing import Literal
-import os
-os.environ.setdefault("OTEL_SERVICE_NAME", "open-deep-research")
-from dotenv import load_dotenv
-load_dotenv(Path(__file__).resolve().parent / ".env")
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Query
 
-from agents.open_deep_research_agent import OpenDeepResearchAgent
 from agents.base import FailureInjectionConfig
+from agents.open_deep_research_agent import OpenDeepResearchAgent
+
+os.environ.setdefault("OTEL_SERVICE_NAME", "open-deep-research")
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(title="LangGraph Benchmark API", version="0.2.0")
 
@@ -25,6 +28,7 @@ ErrorType = Literal["loop", "timeout", "retrieval_fail", "hallucination", "conte
 def _langfuse_status() -> str:
     try:
         from langfuse import get_client
+
         return "connected" if get_client().auth_check() else "auth_failed"
     except ImportError:
         return "not_installed"
@@ -37,9 +41,6 @@ def health() -> dict:
     return {
         "status": "ok",
         "system": "open_deep_research",
-        # Real signal instead of the old LANGCHAIN_TRACING_V2 env var, which
-        # only ever indicated LangSmith tracing (a different product) and
-        # said nothing about whether Langfuse was actually reachable.
         "langfuse": _langfuse_status(),
     }
 
@@ -81,14 +82,16 @@ def run(
     for i in range(n):
         task = pool[i % len(pool)]
         r = agent.run(task)
-        results.append({
-            "run_id": str(uuid.uuid4()),
-            "task": r.task,
-            "success": r.success,
-            "error": r.error,
-            "duration_s": round(r.duration_s, 3),
-            "retries": r.retries,
-        })
+        results.append(
+            {
+                "run_id": str(uuid.uuid4()),
+                "task": r.task,
+                "success": r.success,
+                "error": r.error,
+                "duration_s": round(r.duration_s, 3),
+                "retries": r.retries,
+            }
+        )
 
     return {
         "batch_id": str(uuid.uuid4()),

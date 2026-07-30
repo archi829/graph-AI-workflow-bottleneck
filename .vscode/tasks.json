@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "repo-restructure-step0",
+			"type": "shell",
+			"command": "mkdir -p api scripts graph models/checkpoints evals dashboard notebooks && git mv app.py api/app.py && git mv run_langgraph_app.py api/run_langgraph_app.py && git mv run_batch.py scripts/run_batch.py && git mv run_langgraph_batch.py scripts/run_langgraph_batch.py && git mv build_dataset.py scripts/build_dataset.py && git mv merge_traces.py scripts/merge_traces.py && git mv crewjsonl.py scripts/crewjsonl.py && git mv \"export_traces(crewai wo ids).py\" scripts/export_traces.py",
+			"isBackground": false
+		}
+	]
+}

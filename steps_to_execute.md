@@ -25,7 +25,7 @@
 
 7. Test the setup:
    ```bash
-   python run_batch.py --system crewai --n 3
+   python -m scripts.run_batch --system crewai --n 3
    ```
 8. if ollama(wsl) to windows command prompt connection problem (openai api not responding):
    - run `ip route | grep default | awk '{print $3}'` in wsl, get ip address, update in .env for LLM_BASE_URL=http://172.27.144.1:11434/v1
@@ -39,7 +39,7 @@ Run everything in the following order.
 ## Step 1: Generate traces
 
 ```bash
-python run_batch.py --system crewai --n 10 --sleep 0
+python -m scripts.run_batch --system crewai --n 10 --sleep 0
 ```
 
 Output:
@@ -54,7 +54,7 @@ Output:
 ## Step 2: Export traces from Langfuse
 
 ```bash
-python export_traces.py --input data/raw/agent_system=crewai/batch_<timestamp>.jsonl
+python -m scripts.export_traces --input data/raw/agent_system=crewai/batch_<timestamp>.jsonl
 ```
 
 Output:
@@ -71,7 +71,7 @@ data/raw/agent_system=crewai/<trace_id>.json
 ## Step 3: Build the final dataset
 
 ```bash
-python build_dataset.py
+python -m scripts.build_dataset
 ```
 
 Output:
@@ -90,7 +90,7 @@ data/index.jsonl
 ## 70 clean traces
 
 ```bash
-python run_batch.py --system crewai --n 70 --sleep 0
+python -m scripts.run_batch --system crewai --n 70 --sleep 0
 ```
 
 ---
@@ -98,7 +98,7 @@ python run_batch.py --system crewai --n 70 --sleep 0
 ## 10 faulty traces — Loop motif
 
 ```bash
-python run_batch.py --system crewai --n 10 --sleep 0 --faulty --error-type loop
+python -m scripts.run_batch --system crewai --n 10 --sleep 0 --faulty --error-type loop
 ```
 
 ---
@@ -106,7 +106,7 @@ python run_batch.py --system crewai --n 10 --sleep 0 --faulty --error-type loop
 ## 10 faulty traces — Retrieval failure
 
 ```bash
-python run_batch.py --system crewai --n 10 --sleep 0 --faulty --error-type retrieval_fail --prob 0.4
+python -m scripts.run_batch --system crewai --n 10 --sleep 0 --faulty --error-type retrieval_fail --prob 0.4
 ```
 
 ---
@@ -114,7 +114,7 @@ python run_batch.py --system crewai --n 10 --sleep 0 --faulty --error-type retri
 ## 5 faulty traces — Timeout
 
 ```bash
-python run_batch.py --system crewai --n 5 --sleep 0 --faulty --error-type timeout
+python -m scripts.run_batch --system crewai --n 5 --sleep 0 --faulty --error-type timeout
 ```
 
 ---
@@ -122,7 +122,7 @@ python run_batch.py --system crewai --n 5 --sleep 0 --faulty --error-type timeou
 ## 5 faulty traces — Hallucination
 
 ```bash
-python run_batch.py --system crewai --n 5 --sleep 0 --faulty --error-type hallucination --prob 0.4
+python -m scripts.run_batch --system crewai --n 5 --sleep 0 --faulty --error-type hallucination --prob 0.4
 ```
 
 ---
@@ -138,14 +138,14 @@ mkdir logs
 Run long jobs with `nohup` so they continue even after the terminal is closed:
 
 ```bash
-nohup python run_batch.py --system crewai --n 70 --sleep 0 > logs/batch_clean.log 2>&1 &
+nohup python -m scripts.run_batch --system crewai --n 70 --sleep 0 > logs/batch_clean.log 2>&1 &
 ```
 
 ```
 bash
-nohup python run_batch.py --system crewai --n 10 --sleep 0 --faulty --error-type retrieval_fail --prob 0.4 > logs/batch_retrieval.log 2>&1 && \
-nohup python run_batch.py --system crewai --n 5 --sleep 0 --faulty --error-type timeout > logs/batch_timeout.log 2>&1 && \
-nohup python run_batch.py --system crewai --n 5 --sleep 0 --faulty --error-type hallucination --prob 0.4 > logs/batch_hallucination.log 2>&1 &
+nohup python -m scripts.run_batch --system crewai --n 10 --sleep 0 --faulty --error-type retrieval_fail --prob 0.4 > logs/batch_retrieval.log 2>&1 && \
+nohup python -m scripts.run_batch --system crewai --n 5 --sleep 0 --faulty --error-type timeout > logs/batch_timeout.log 2>&1 && \
+nohup python -m scripts.run_batch --system crewai --n 5 --sleep 0 --faulty --error-type hallucination --prob 0.4 > logs/batch_hallucination.log 2>&1 &
 ```
 Monitor progress:
 
@@ -157,7 +157,7 @@ tail -f logs/batch_clean.log
 for f in data/raw/agent_system=crewai/batch_*.jsonl; do
     if [ -s "$f" ]; then
         echo "=== $f ==="
-        python export_traces.py --input "$f"
+      python -m scripts.export_traces --input "$f"
     fi
 done
 ```

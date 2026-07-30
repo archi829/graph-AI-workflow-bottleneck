@@ -8,19 +8,9 @@ full collection, and writes data/index.jsonl -- the final artifact
 Sprint 1 needs before GNN modeling can begin.
 
 Usage:
-    python build_dataset.py
-    python build_dataset.py --raw-dir data/raw --out data/index.jsonl
-    python build_dataset.py --raw-dir data/raw --stats   # print stats only, no write
-
-The run_labels logic:
-  success   -- from run_record.success (set by run_batch.py)
-  slow      -- total_latency_ms > 75th percentile across the batch
-  expensive -- total_tokens > 75th percentile across the batch
-
-These percentile thresholds match the project doc (Section 3 note: "latency
-above percentile threshold"). They're computed over the merged dataset so
-TRAIL traces, CrewAI traces, and open_deep_research traces are all compared
-against a single shared distribution, not per-system buckets.
+    python -m scripts.build_dataset
+    python -m scripts.build_dataset --raw-dir data/raw --out data/index.jsonl
+    python -m scripts.build_dataset --raw-dir data/raw --stats
 """
 
 from __future__ import annotations
@@ -30,10 +20,6 @@ import json
 import sys
 from pathlib import Path
 
-
-# ---------------------------------------------------------------------------
-# Schema validation -- catch malformed files from export_traces.py early
-# ---------------------------------------------------------------------------
 REQUIRED_TRACE_FIELDS = {"trace_id", "agent_system", "spans", "run_labels", "meta"}
 REQUIRED_SPAN_FIELDS = {
     "span_id", "parent_id", "role", "name", "latency_ms",
@@ -48,12 +34,11 @@ VALID_SYNTHETIC_ERROR_TYPES = {
 
 
 def validate_trace(trace: dict, path: Path) -> list[str]:
-    """Returns a list of validation errors (empty = valid)."""
     errors = []
     missing = REQUIRED_TRACE_FIELDS - set(trace.keys())
     if missing:
         errors.append(f"missing top-level fields: {missing}")
-        return errors  # can't validate further without these
+        return errors
 
     if trace["agent_system"] not in VALID_AGENT_SYSTEMS:
         errors.append(f"invalid agent_system: {trace['agent_system']!r}")
@@ -72,9 +57,6 @@ def validate_trace(trace: dict, path: Path) -> list[str]:
     return errors
 
 
-# ---------------------------------------------------------------------------
-# Percentile helper (no numpy dependency)
-# ---------------------------------------------------------------------------
 def _percentile(values: list[float], pct: float) -> float:
     if not values:
         return 0.0
@@ -84,9 +66,6 @@ def _percentile(values: list[float], pct: float) -> float:
     return sorted_v[lo] + (k - lo) * (sorted_v[hi] - sorted_v[lo])
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Merge exported traces into data/index.jsonl.")
     p.add_argument("--raw-dir", default="data/raw",
@@ -113,7 +92,6 @@ def main() -> None:
         print("Run export_traces.py first.")
         sys.exit(1)
 
-    # --- Load all trace JSON files ---
     all_files = sorted(raw_dir.rglob("*.json"))
     if not all_files:
         print(f"No .json files found under {raw_dir}. Run export_traces.py first.")
@@ -151,7 +129,6 @@ def main() -> None:
         print("No valid traces to process. Check export_traces.py output.")
         sys.exit(1)
 
-    # --- Compute percentile thresholds across full merged dataset ---
     latencies = [t["meta"].get("total_latency_ms", 0.0) for t in traces]
     tokens = [t["meta"].get("total_tokens", 0) for t in traces]
 
@@ -162,9 +139,7 @@ def main() -> None:
     print(f"  slow      : total_latency_ms > {slow_threshold:.0f} ms")
     print(f"  expensive : total_tokens     > {expensive_threshold:.0f} tokens")
 
-    # --- Apply labels and build index records ---
     index_records: list[dict] = []
-
     system_counts: dict[str, int] = {}
     error_type_counts: dict[str | None, int] = {}
     role_counts: dict[str, int] = {}
@@ -173,16 +148,9 @@ def main() -> None:
         latency_ms = trace["meta"].get("total_latency_ms", 0.0)
         total_tokens = trace["meta"].get("total_tokens", 0)
 
-        # Overwrite the stub labels written by export_traces.py with the
-        # correctly calibrated percentile-based values.
         trace["run_labels"]["slow"] = latency_ms > slow_threshold
         trace["run_labels"]["expensive"] = total_tokens > expensive_threshold
 
-        # Write updated trace JSON back to disk so downstream code always
-        # reads the corrected labels from the file, not just the index.
-        # (We only do this if not in --stats mode to avoid side effects.)
-
-        # Stats accumulation
         system_counts[trace["agent_system"]] = system_counts.get(trace["agent_system"], 0) + 1
         for span in trace.get("spans", []):
             et = span.get("synthetic_error_type")
@@ -190,9 +158,6 @@ def main() -> None:
             r = span.get("role", "unknown")
             role_counts[r] = role_counts.get(r, 0) + 1
 
-        # The index record: lightweight manifest entry, not the full trace.
-        # GNN training code reads the full JSON from path; the index is just
-        # the lookup table for filtering/splitting by label/system.
         index_record = {
             "trace_id": trace["trace_id"],
             "agent_system": trace["agent_system"],
@@ -218,7 +183,6 @@ def main() -> None:
         }
         index_records.append(index_record)
 
-    # --- Stats printout (always) ---
     print(f"\n=== Dataset stats ({len(traces)} traces) ===")
     print(f"By agent_system:  {dict(sorted(system_counts.items()))}")
     print(f"By span role:     {dict(sorted(role_counts.items()))}")
@@ -243,19 +207,17 @@ def main() -> None:
     total_spans = sum(r["n_spans"] for r in index_records)
     print(f"Total spans across dataset: {total_spans}")
 
-    # --- 300-trace target check ---
     target = 300
     if len(traces) < target:
         print(f"\n[!] {len(traces)}/{target} traces -- need {target - len(traces)} more "
               f"before dataset_v1 is ready for GNN training.")
     else:
-        print(f"\n[✓] {len(traces)}/{target} target met -- dataset_v1 ready.")
+        print(f"\n[OK] {len(traces)}/{target} target met -- dataset_v1 ready.")
 
     if args.stats:
         print("\n--stats mode: no files written.")
         return
 
-    # --- Write updated trace JSONs with corrected labels ---
     for trace in traces:
         out_path = (
             Path(args.raw_dir)
@@ -265,7 +227,6 @@ def main() -> None:
         if out_path.exists():
             out_path.write_text(json.dumps(trace, indent=2, default=str))
 
-    # --- Write index.jsonl ---
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w") as f:

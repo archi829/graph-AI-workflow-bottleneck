@@ -2,20 +2,13 @@
 """
 Batch runner -- Person A's deliverable (Section 4).
 
-    python run_batch.py --system crewai --n 30
-    python run_batch.py --system crewai --n 30 --faulty --error-type loop
+    python -m scripts.run_batch --system crewai --n 30
+    python -m scripts.run_batch --system crewai --n 30 --faulty --error-type loop
 
 Each run is one task pulled (round-robin, with repeats once exhausted) from
 the system's TASK_POOL. Results are appended as JSON lines to
 data/raw/agent_system=<system>/batch_<timestamp>.jsonl so Person B's
-export_traces.py (or, in the meantime, this script's own --export-stub) has
-something concrete to read.
-
-Note: this writes a *run log*, not the final schema-conformant trace JSON --
-span-level detail (latency per span, tokens, cost) only exists inside
-Langfuse once instrumentation is wired (telemetry/instrument.py). This file
-is enough to (a) drive batches, (b) toggle failure injection per Appendix B,
-(c) confirm success/failure counts while B's exporter comes online.
+export_traces.py has something concrete to read.
 """
 
 from __future__ import annotations
@@ -23,9 +16,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
 import uuid
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from agents import REGISTRY
 from agents.evaluation import evaluate_batch
@@ -64,7 +62,6 @@ def parse_args() -> argparse.Namespace:
 
 def apply_failure_flags(args: argparse.Namespace) -> None:
     """Sets the Appendix B env flags for this process before any run."""
-    # Always clear all flags first so batches don't leak into each other.
     for env_var in FAILURE_FLAGS.values():
         os.environ.pop(env_var, None)
 
@@ -127,14 +124,12 @@ def main() -> None:
                 + (f" error_type={result.synthetic_error_type}" if not result.success else "")
             )
 
-            # Flush to Langfuse every 10 tasks so traces appear incrementally
-            # rather than all at the end -- safer for long overnight runs where
-            # a crash near the end would otherwise lose everything.
             if (i + 1) % 10 == 0:
                 try:
                     from langfuse import get_client
+
                     get_client().flush()
-                    print(f"  → flushed {i + 1} traces to Langfuse")
+                    print(f"flushed {i + 1} traces to Langfuse")
                 except Exception:
                     pass
 
@@ -152,7 +147,7 @@ def main() -> None:
         except ImportError:
             pass
 
-    print(f"Next: python export_traces.py --system {args.system} --input {out_path}")
+    print(f"Next: python -m scripts.export_traces --input {out_path}")
 
 
 if __name__ == "__main__":

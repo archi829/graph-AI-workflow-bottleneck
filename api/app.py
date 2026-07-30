@@ -7,7 +7,7 @@ Keeps Person B's Langfuse export agnostic to which system ran (Section 6):
 B's exporter just watches Langfuse, it never has to call into this app.
 
 Run locally:
-    uvicorn app:app --reload --port 8000
+    uvicorn api.app:app --reload --port 8000
 """
 
 from __future__ import annotations

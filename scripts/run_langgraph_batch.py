@@ -3,18 +3,29 @@
 Standalone Batch Runner for the Custom LangGraph Agent.
 Does not touch any CrewAI code or shared telemetry.
 """
+
 from __future__ import annotations
+
 import argparse
 import json
+import os
+import sys
 import time
 import uuid
 from pathlib import Path
-import os
-os.environ["OTEL_SERVICE_NAME"] = "open-deep-research"
+
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).resolve().parent / ".env")
-from agents.open_deep_research_agent import OpenDeepResearchAgent
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+os.environ["OTEL_SERVICE_NAME"] = "open-deep-research"
+load_dotenv(ROOT / ".env")
+
 from agents.base import FailureInjectionConfig
+from agents.open_deep_research_agent import OpenDeepResearchAgent
+
 FAILURE_FLAGS = {
     "loop": "loop",
     "timeout": "timeout",
@@ -45,17 +56,12 @@ def parse_args() -> argparse.Namespace:
         "--system",
         choices=["open_deep_research"],
         default="open_deep_research",
-        help=(
-            "Kept for command-line compatibility with the CrewAI/FinRobot "
-            "runners, which take the same --system flag. This script only "
-            "ever runs open_deep_research, so any other value is rejected "
-            "by argparse itself."
-        ),
+        help="Compatibility flag with other runners.",
     )
     p.add_argument(
         "--skip-langfuse-check",
         action="store_true",
-        help="Skip the Langfuse auth check at startup (still runs, just without the pre-flight warning).",
+        help="Skip the Langfuse auth check at startup.",
     )
     args = p.parse_args()
 
@@ -90,23 +96,21 @@ def build_failure_config(args: argparse.Namespace) -> FailureInjectionConfig:
 
 
 def check_langfuse_connection() -> bool:
-    """Fail fast (but not fatally) if Langfuse isn't reachable, so you find
-    out before burning a 50-run faulty batch, not after."""
     try:
         from langfuse import get_client
+
         client = get_client()
         ok = client.auth_check()
         if ok:
-            print("Langfuse: connected \u2705")
+            print("Langfuse: connected")
         else:
             print(
-                "Langfuse: auth check FAILED \u274c "
-                "(check LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST in .env). "
-                "Runs will still execute, but traces will not appear in the dashboard."
+                "Langfuse: auth check failed "
+                "(check LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST in .env)."
             )
         return ok
     except ImportError:
-        print("Langfuse: package not installed (`pip install langfuse`). Traces will not be recorded.")
+        print("Langfuse: package not installed (pip install langfuse). Traces will not be recorded.")
         return False
     except Exception as exc:
         print(f"Langfuse: could not connect ({exc}). Traces will not be recorded.")
@@ -122,14 +126,12 @@ def main() -> None:
     failure_cfg = build_failure_config(args)
     system = OpenDeepResearchAgent(failure_config=failure_cfg)
 
-    # Output to our own separate folder
     out_dir = Path("data/raw/agent_system=open_deep_research")
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"batch_{int(time.time())}.jsonl"
 
     pool = system.TASK_POOL
     successes, failures = 0, 0
-    records = []
 
     print(f"Starting LangGraph Batch: n={args.n} | faulty={args.faulty} | type={args.error_type}")
     if args.faulty and args.prob is not None:
@@ -155,7 +157,6 @@ def main() -> None:
                 "retries": result.retries,
                 "faulty_batch": args.faulty,
             }
-            records.append(record)
             f.write(json.dumps(record) + "\n")
             f.flush()
             print(

@@ -45,7 +45,7 @@ lowest-friction starting point (and to stay clear of FinRobot, since that
 one may already be claimed). Structure follows Appendix A of the project
 doc so `open_deep_research` or `finrobot` can be dropped in later as
 `agents/open_deep_research_agent.py` / `agents/finrobot_agent.py` without
-touching `run_batch.py` or `app.py` — they just register in `agents/__init__.py`.
+touching `scripts/run_batch.py` or `api/app.py` — they just register in `agents/__init__.py`.
 
 ## What's here
 
@@ -59,8 +59,10 @@ agents/
   __init__.py         # REGISTRY = {"crewai": CrewAIAgent}
 telemetry/
   instrument.py       # one-liner Langfuse/OTel instrumentation hook
-run_batch.py          # CLI: --system crewai --n 30 [--faulty --error-type loop]
-app.py                # FastAPI POST /run?system=&n=&faulty=&error_type=
+scripts/
+   run_batch.py        # CLI: --system crewai --n 30 [--faulty --error-type loop]
+api/
+   app.py              # FastAPI POST /run?system=&n=&faulty=&error_type=
 Dockerfile
 docker-compose.yml    # app container only -- see Langfuse note below
 requirements.txt
@@ -114,7 +116,7 @@ block/retry a task; `compute_run_labels` / `evaluate_batch` run *after* a
 batch completes and compute `run_labels`-style stats (`success`, `slow`,
 `expensive`) matching the shared schema (Section 3) so you can sanity-check
 output locally before it ever reaches Person C's labeling pipeline.
-`run_batch.py` now prints a scorecard at the end of every batch.
+`scripts/run_batch.py` now prints a scorecard at the end of every batch.
 
 **`RunResult` (agents/base.py)** carries `structured_output` (the Writer's
 `FinalAnswer` as a dict), `tokens_used`, and `retries` alongside the
@@ -149,15 +151,11 @@ memory — and want to flag what's drifted or wasn't obvious from docs alone:
    self-hosted block is in `docker-compose.yml` if the team decides
    otherwise.
 
-<<<<<<< HEAD
 4. **litellm needs the `ollama/` prefix, not a bare model name + base_url.**
    `LLM(model="llama3.2:3b", base_url="http://localhost:11434/v1")` raises
    `BadRequestError: LLM Provider NOT provided` — litellm routes by prefix,
    not by base_url alone. Use `LLM_MODEL=ollama/llama3.2:3b`. Verified
    directly with `litellm.get_llm_provider()`.
-
-=======
->>>>>>> 17ab2c83e513018d90a7f57c60b3692b17f2a163
 Everything else (Agent/Task/Crew/Process field names, `output_pydantic`,
 `guardrail`/`guardrail_max_retries`, `@tool` decorator signature,
 `openinference-instrumentation-crewai`, `langfuse`, `tenacity`) matched the
@@ -177,18 +175,18 @@ cp .env.example .env
 python agents/crewai_agent.py
 
 # or via the batch CLI (prints a scorecard at the end)
-python run_batch.py --system crewai --n 3
+python -m scripts.run_batch --system crewai --n 3
 
 # or via the API
-uvicorn app:app --reload --port 8000
+uvicorn api.app:app --reload --port 8000
 curl -X POST "http://localhost:8000/run?system=crewai&n=3"
 ```
 
 ### Running a faulty batch (failure injection, Appendix B)
 
 ```bash
-python run_batch.py --system crewai --n 10 --faulty --error-type loop
-python run_batch.py --system crewai --n 10 --faulty --error-type retrieval_fail --prob 0.3
+python -m scripts.run_batch --system crewai --n 10 --faulty --error-type loop
+python -m scripts.run_batch --system crewai --n 10 --faulty --error-type retrieval_fail --prob 0.3
 ```
 
 Note on injection fidelity: `loop` (task repetition), `timeout` (real sleep
@@ -203,8 +201,8 @@ the same point about `agentic-rag-for-dummies`).
 
 ## What's NOT done yet (by design — other people's rows)
 
-- Langfuse deployment + `export_traces.py` → `data/raw/*.json` schema mapping (Person B)
-- TRAIL ingestion, labeling, `build_dataset.py` (Person C)
+- Langfuse deployment + `scripts/export_traces.py` → `data/raw/*.json` schema mapping (Person B)
+- TRAIL ingestion, labeling, `scripts/build_dataset.py` (Person C)
 - `open_deep_research` and `finrobot` system wrappers (whoever picks those up next)
 
 ## Next step for you
