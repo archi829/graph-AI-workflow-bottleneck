@@ -9,13 +9,19 @@ Exits 1  → drift detected (CI gate blocks PR)
 import json
 import statistics
 import sys
-from scorer import normalize_trace, score_trace
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from evals.scorer import normalize_trace, score_trace
 
 # ---------------------------------------------------------------------------
 # Tunable parameters
 # ---------------------------------------------------------------------------
 ALPHA = 0.3          # EWMA smoothing — higher = reacts faster to recent traces
-TRACE_PATH = "data/all_traces.jsonl"
+TRACE_PATH = PROJECT_ROOT / "data" / "all_traces.jsonl"
 
 # THRESHOLD is set dynamically via calibrate_threshold() below.
 # Hardcode a fallback only if running without prior calibration.
@@ -26,7 +32,7 @@ FALLBACK_THRESHOLD = 0.50
 # Core functions
 # ---------------------------------------------------------------------------
 
-def load_traces(jsonl_path: str) -> list[dict]:
+def load_traces(jsonl_path: str | Path) -> list[dict]:
     with open(jsonl_path) as f:
         return [json.loads(line) for line in f if line.strip()]
 
@@ -52,7 +58,7 @@ def calibrate_threshold(scores: list[float]) -> float:
     return round(mean - stdev, 4)
 
 
-def run_drift_check(jsonl_path: str = TRACE_PATH) -> dict:
+def run_drift_check(jsonl_path: str | Path = TRACE_PATH) -> dict:
     traces = load_traces(jsonl_path)
 
     # Score every trace (normalisation handled inside score_trace)

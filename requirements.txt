@@ -13,3 +13,11 @@ langfuse>=3.0
 # langchain
 # tavily-python
 # duckduckgo-search
+
+streamlit
+plotly
+pandas
+torch
+torch-geometric
+xgboost
+opentelemetry-sdk

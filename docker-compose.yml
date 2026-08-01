@@ -11,6 +11,18 @@ services:
     # or a self-hosted stack Person B runs separately. See README.md,
     # "Langfuse: a heads-up" section, for why this isn't bundled here.
 
+  dashboard:
+    build: .
+    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - app
+
 # --- Uncomment if you want a fully local, self-hosted Langfuse v3 stack ---
 # instead of Langfuse Cloud. This is the CURRENT (2026) requirement -- six
 # containers, not the Postgres-only setup the original project doc assumed.
